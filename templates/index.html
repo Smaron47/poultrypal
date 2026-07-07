@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Diagnostic Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen selection:bg-cyan-500 selection:text-slate-900">
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="mb-10 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6 border-b border-slate-800 pb-6">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-teal-400 to-indigo-400 bg-clip-text text-transparent">
+                    Grad-CAM Visualization Studio
+                </h1>
+                <p class="text-slate-400 mt-1 text-sm">Explainable Convolutional Networks & Deep Feature Auditing</p>
+            </div>
+            
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3 w-full md:w-auto shadow-inner">
+                <input type="text" id="modelPathInput" value="best_model_weights.h5" 
+                       class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 w-full md:w-64 tracking-mono transition" placeholder="Weights File Path...">
+                <button onclick="updateModelConfig()" 
+                        class="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg shadow-md hover:shadow-cyan-500/20 active:scale-95 transition-all duration-150 shrink-0">
+                    Mount Weights
+                </button>
+            </div>
+        </header>
+
+        <div id="statusToast" class="hidden mb-6 p-4 rounded-xl text-sm font-semibold transition-all duration-300 transform scale-95 opacity-0"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass-panel p-6 rounded-2xl shadow-xl">
+                    <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                        Data Pipeline Upload
+                    </h2>
+                    
+                    <form id="uploadForm">
+                        <label dir="ltr" class="group relative flex flex-col items-center justify-center border-2 border-dashed border-slate-700 hover:border-cyan-500/50 rounded-xl cursor-pointer p-8 bg-slate-900/40 hover:bg-slate-900/80 transition-all duration-200">
+                            <div class="text-center">
+                                <svg class="mx-auto h-12 w-12 text-slate-500 group-hover:text-cyan-400 transition duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 002-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <p class="mt-4 text-xs font-medium text-slate-300">
+                                    Drag source image here or <span class="text-cyan-400 underline decoration-cyan-500/30 group-hover:decoration-cyan-400">browse files</span>
+                                </p>
+                                <p class="mt-1 text-[10px] text-slate-500 uppercase tracking-wider">PNG, JPG, JPEG, WEBP</p>
+                            </div>
+                            <input type="file" id="imageFileInput" name="image" class="hidden" accept="image/*" onchange="triggerPrediction()">
+                        </label>
+                    </form>
+                </div>
+
+                <div id="metricsCard" class="hidden glass-panel p-6 rounded-2xl shadow-xl bg-gradient-to-b from-slate-800/40 to-slate-900/40">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Network Outputs</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-[11px] text-slate-500 block uppercase font-bold">Predicted Classification</span>
+                            <span id="labelOutput" class="text-2xl font-black text-white tracking-tight">--</span>
+                        </div>
+                        <div>
+                            <span class="text-[11px] text-slate-500 block uppercase font-bold">Softmax Confidence Score</span>
+                            <div class="flex items-center gap-3 mt-1">
+                                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                                    <div id="confidenceBar" class="bg-gradient-to-r from-cyan-400 to-teal-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <span id="confidenceOutput" class="text-sm font-mono font-bold text-teal-400">0.00%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8">
+                <div class="glass-panel p-6 rounded-2xl shadow-xl min-h-[400px] flex flex-col justify-between">
+                    <h2 class="text-lg font-bold text-slate-200 mb-6">Analytical Visualization Outputs</h2>
+                    
+                    <div id="emptyState" class="my-auto text-center py-12">
+                        <div class="inline-flex p-4 rounded-full bg-slate-900 border border-slate-800 mb-4">
+                            <svg class="h-8 w-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-sm font-semibold text-slate-400">No Target Active</h3>
+                        <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Mount your weights model above, then upload a target classification sample image to visualize focus features.</p>
+                    </div>
+
+                    <div id="visualCanvas" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 my-auto">
+                        <div class="space-y-2">
+                            <span class="text-xs font-semibold text-slate-400 block tracking-wide text-center">Original Ground Asset</span>
+                            <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900 aspect-square shadow-md">
+                                <img id="displayOriginal" class="w-full h-full object-contain" src="" alt="Original input">
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <span class="text-xs font-semibold text-cyan-400 block tracking-wide text-center">Grad-CAM Feature Activation Map</span>
+                            <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900 aspect-square shadow-md relative">
+                                <img id="displayGradCam" class="w-full h-full object-contain" src="" alt="Grad-CAM Activation map">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-slate-800/60 mt-6 pt-4 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Backend Pipeline Status: <span id="pipelineStatus" class="text-amber-500 font-semibold">Uninitialized</span></span>
+                        <span>v2.4 Engine Architecture</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Check status without forcing a hard reload of the weights
+        window.addEventListener('DOMContentLoaded', async () => {
+            const statusIndicator = document.getElementById('pipelineStatus');
+            statusIndicator.textContent = "Model Pre-Loaded & Ready";
+            statusIndicator.className = "text-emerald-400 font-semibold";
+        });
+        function showStatus(message, isError = false) {
+            const banner = document.getElementById('statusToast');
+            banner.textContent = message;
+            banner.className = `mb-6 p-4 rounded-xl text-sm font-semibold transition-all duration-300 transform scale-100 opacity-100 ${
+                isError ? 'bg-red-950/80 border border-red-800/40 text-red-400' : 'bg-emerald-950/80 border border-emerald-800/40 text-emerald-400'
+            }`;
+        }
+        async function updateModelConfig() {
+            const inputPath = document.getElementById('modelPathInput').value;
+            const statusIndicator = document.getElementById('pipelineStatus');
+            
+            try {
+                const response = await fetch('/configure', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ model_path: inputPath })
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(result.message, false);
+                    statusIndicator.textContent = "Model Mounted";
+                    statusIndicator.className = "text-emerald-400 font-semibold";
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (err) {
+                showStatus(`Mount Failure: ${err.message}`, true);
+                statusIndicator.textContent = "Graph Error";
+                statusIndicator.className = "text-red-500 font-semibold";
+            }
+        }
+        async function triggerPrediction() {
+            const fileInput = document.getElementById('imageFileInput');
+            if (!fileInput.files || fileInput.files.length === 0) return;
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+            // Reveal and trigger loader states
+            document.getElementById('emptyState').classList.add('hidden');
+            const statusIndicator = document.getElementById('pipelineStatus');
+            statusIndicator.textContent = "Processing Inference...";
+            statusIndicator.className = "text-cyan-400 animate-pulse font-semibold";
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    // Inject Visual Elements
+                    document.getElementById('displayOriginal').src = result.original_image;
+                    document.getElementById('displayGradCam').src = result.gradcam_image;
+                    
+                    // Inject Analytical Metrics Strings
+                    document.getElementById('labelOutput').textContent = result.prediction;
+                    document.getElementById('confidenceOutput').textContent = result.confidence;
+                    document.getElementById('confidenceBar').style.width = result.confidence;
+                    
+                    // Switch display panels
+                    document.getElementById('visualCanvas').classList.remove('hidden');
+                    document.getElementById('metricsCard').classList.remove('hidden');
+                    
+                    statusIndicator.textContent = "Analysis Complete";
+                    statusIndicator.className = "text-emerald-400 font-semibold";
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (err) {
+                showStatus(`Inference Blocked: ${err.message}`, true);
+                statusIndicator.textContent = "Execution Halted";
+                statusIndicator.className = "text-red-500 font-semibold";
+            }
+        }
+        if (response.ok) {
+    // Inject Visual Elements
+    document.getElementById('displayOriginal').src = result.original_image;
+    document.getElementById('displayGradCam').src = result.gradcam_image;
+    
+    // Inject Analytical Metrics Strings
+    const labelElem = document.getElementById('labelOutput');
+    labelElem.textContent = result.prediction;
+    
+    // Dynamically change text colors if the threshold fails
+    if(result.passed_threshold) {
+        labelElem.className = "text-2xl font-black text-white tracking-tight";
+        document.getElementById('confidenceBar').className = "bg-gradient-to-r from-cyan-400 to-teal-400 h-2.5 rounded-full transition-all duration-500";
+    } else {
+        labelElem.className = "text-xl font-black text-amber-400 tracking-tight animate-pulse";
+        document.getElementById('confidenceBar').className = "bg-amber-500 h-2.5 rounded-full transition-all duration-500";
+    }
+    
+    document.getElementById('confidenceOutput').textContent = `${result.confidence} (Req: ${result.threshold_required})`;
+    document.getElementById('confidenceBar').style.width = result.confidence;
+    
+    // Switch display panels
+    document.getElementById('visualCanvas').classList.remove('hidden');
+    document.getElementById('metricsCard').classList.remove('hidden');
+    
+    statusIndicator.textContent = result.passed_threshold ? "Analysis Complete" : "Warning: Low Certainty Target";
+    statusIndicator.className = result.passed_threshold ? "text-emerald-400 font-semibold" : "text-amber-500 font-semibold";
+}
+    </script>
+</body>
+</html>
