@@ -1,5 +1,5 @@
 Flask==3.0.2
-tensorflow-cpu      # CRITICAL: Barebones CPU distribution saves ~400MB RAM
+tensorflow      # CRITICAL: Barebones CPU distribution saves ~400MB RAM
 numpy==1.26.4
 opencv-python-headless==4.9.0.80  # CRITICAL: Bypasses server GUI package dependencies
 Pillow==10.2.0
